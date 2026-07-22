@@ -1,7 +1,7 @@
 name: astrbot_plugin_zhijiang_calendar
 display_name: 枝江日程
 desc: 在 QQ 白名单群中定时推送 A-SOUL 今日直播日程。
-version: v1.0.0
+version: v1.1.0
 author: Neelura & ChatGPT 5.6
 repo: https://github.com/Neeelura/astrbot_plugin_zhijiang_calendar.git
 support_platforms:

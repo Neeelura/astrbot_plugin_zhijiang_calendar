@@ -254,6 +254,42 @@ def format_schedule_message(
     return "\n".join(lines)
 
 
+def format_start_reminder(items: Iterable[ScheduleItem]) -> str:
+    lines = ["【枝江开播提醒】"]
+    for item in items:
+        lines.append(f"{item.time}｜{item.title}")
+        if item.streamers:
+            lines.append(f"{'、'.join(item.streamers)}的直播时间到了")
+        else:
+            lines.append("该场直播时间到了")
+    return "\n".join(lines)
+
+
+def future_start_reminders(
+    target_date: date, items: Iterable[ScheduleItem], now: datetime
+) -> list[tuple[datetime, list[ScheduleItem]]]:
+    if target_date != now.date():
+        return []
+
+    grouped: dict[datetime, list[ScheduleItem]] = {}
+    for item in items:
+        try:
+            hour, minute = (int(part) for part in item.time.split(":"))
+            run_at = datetime(
+                target_date.year,
+                target_date.month,
+                target_date.day,
+                hour,
+                minute,
+                tzinfo=now.tzinfo,
+            )
+        except (TypeError, ValueError):
+            continue
+        if run_at > now:
+            grouped.setdefault(run_at, []).append(item)
+    return sorted(grouped.items(), key=lambda entry: entry[0])
+
+
 def cooldown_remaining(
     now: datetime, last_fetch_at: datetime | None, cooldown: timedelta
 ) -> timedelta:

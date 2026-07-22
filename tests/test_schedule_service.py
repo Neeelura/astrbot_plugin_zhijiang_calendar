@@ -12,6 +12,8 @@ from astrbot_plugin_zhijiang_calendar.schedule_service import (
     ScheduleItem,
     cooldown_remaining,
     format_schedule_message,
+    format_start_reminder,
+    future_start_reminders,
     next_daily_run,
     parse_schedule_html,
 )
@@ -120,6 +122,51 @@ class FormattingAndSchedulingTests(unittest.TestCase):
         self.assertEqual(
             next_daily_run(now, 9),
             datetime(2026, 7, 23, 9, 0, tzinfo=shanghai_time),
+        )
+
+    def test_formats_single_start_reminder(self) -> None:
+        message = format_start_reminder(
+            [ScheduleItem("20:00", "小恶魔VS坏女人", ("嘉然", "乃琳"))]
+        )
+        self.assertEqual(
+            message,
+            "【枝江开播提醒】\n20:00｜小恶魔VS坏女人\n嘉然、乃琳的直播时间到了",
+        )
+
+    def test_combines_start_reminders_at_the_same_time(self) -> None:
+        message = format_start_reminder(
+            [
+                ScheduleItem("20:00", "直播 A", ("嘉然",)),
+                ScheduleItem("20:00", "直播 B", ("乃琳",)),
+            ]
+        )
+        self.assertEqual(
+            message,
+            (
+                "【枝江开播提醒】\n"
+                "20:00｜直播 A\n嘉然的直播时间到了\n"
+                "20:00｜直播 B\n乃琳的直播时间到了"
+            ),
+        )
+
+    def test_only_schedules_future_reminders_and_groups_equal_times(self) -> None:
+        shanghai_time = timezone(timedelta(hours=8), name="Asia/Shanghai")
+        now = datetime(2026, 7, 22, 20, 0, tzinfo=shanghai_time)
+        first = ScheduleItem("21:00", "直播 A", ("嘉然",))
+        second = ScheduleItem("21:00", "直播 B", ("乃琳",))
+        reminders = future_start_reminders(
+            date(2026, 7, 22),
+            [
+                ScheduleItem("19:00", "已经错过", ("向晚",)),
+                ScheduleItem("20:00", "当前时间", ("贝拉",)),
+                first,
+                second,
+            ],
+            now,
+        )
+        self.assertEqual(
+            reminders,
+            [(datetime(2026, 7, 22, 21, 0, tzinfo=shanghai_time), [first, second])],
         )
 
     def test_cooldown_remaining_is_zero_without_previous_fetch(self) -> None:

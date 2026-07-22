@@ -17,6 +17,8 @@ from .schedule_service import (
     cooldown_remaining,
     fetch_schedule,
     format_schedule_message,
+    format_start_reminder,
+    future_start_reminders,
     next_daily_run,
 )
 
@@ -45,6 +47,7 @@ class ZhijiangCalendarPlugin(Star):
         self._last_fetch_at: datetime | None = None
         self._fetch_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[None]] = set()
+        self._reminder_task: asyncio.Task[None] | None = None
 
     async def initialize(self) -> None:
         self._cache = self._coerce_cache(await self.get_kv_data(CACHE_KEY, None))
@@ -56,19 +59,26 @@ class ZhijiangCalendarPlugin(Star):
         )
 
         await self._ensure_today_cache()
+        today = datetime.now(TIMEZONE).date()
+        self._reschedule_start_reminders(today, self._cached_items(today))
         self._start_task(self._daily_loop(0, self._scheduled_fetch), "fetch")
         self._start_task(self._daily_loop(9, self._scheduled_push), "push")
         logger.info(
             "枝江日程插件已启动，白名单群数量: %d", len(self.group_whitelist)
         )
 
-    def _start_task(self, coroutine: Awaitable[None], name: str) -> None:
+    def _start_task(
+        self, coroutine: Awaitable[None], name: str
+    ) -> asyncio.Task[None]:
         task = asyncio.create_task(coroutine, name=f"zhijiang-calendar-{name}")
         self._tasks.add(task)
         task.add_done_callback(self._on_task_done)
+        return task
 
     def _on_task_done(self, task: asyncio.Task[None]) -> None:
         self._tasks.discard(task)
+        if task is self._reminder_task:
+            self._reminder_task = None
         if task.cancelled():
             return
         try:
@@ -150,8 +160,38 @@ class ZhijiangCalendarPlugin(Star):
         self._last_fetch_at = fetched_at
         await self.put_kv_data(CACHE_KEY, self._cache)
         await self.put_kv_data(LAST_FETCH_KEY, fetched_at.isoformat())
+        self._reschedule_start_reminders(target_date, items)
         logger.info("已更新 %s 枝江日程，共 %d 场", target_date, len(items))
         return items
+
+    def _reschedule_start_reminders(
+        self, target_date: date, items: list[ScheduleItem]
+    ) -> None:
+        if self._reminder_task and not self._reminder_task.done():
+            self._reminder_task.cancel()
+        self._reminder_task = None
+
+        now = datetime.now(TIMEZONE)
+        if not self.group_whitelist:
+            return
+        reminders = future_start_reminders(target_date, items, now)
+        if reminders:
+            self._reminder_task = self._start_task(
+                self._start_reminder_loop(reminders), "start-reminders"
+            )
+
+    async def _start_reminder_loop(
+        self, reminders: list[tuple[datetime, list[ScheduleItem]]]
+    ) -> None:
+        for run_at, items in reminders:
+            delay = (run_at - datetime.now(TIMEZONE)).total_seconds()
+            if delay <= 0:
+                continue
+            await asyncio.sleep(delay)
+            message = format_start_reminder(items)
+            for group_id in sorted(self.group_whitelist):
+                if not await self._send_to_group(group_id, message):
+                    logger.error("无法向白名单群 %s 推送开播提醒", group_id)
 
     async def _get_or_fetch_today(self) -> list[ScheduleItem]:
         today = datetime.now(TIMEZONE).date()
