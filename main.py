@@ -28,6 +28,12 @@ CACHE_KEY = "today_schedule"
 GROUP_ORIGINS_KEY = "group_origins"
 LAST_FETCH_KEY = "last_fetch_at"
 NO_SCHEDULE_MESSAGE = "今日暂无直播安排。"
+DEFAULT_HELP_TEXT = (
+    "【机器人帮助】\n"
+    "@机器人 帮助 - 查看本帮助\n"
+    "@机器人 今日日程 - 查看今日直播安排\n"
+    "@机器人 刷新日程 - 重新获取今日直播安排"
+)
 
 
 class ZhijiangCalendarPlugin(Star):
@@ -42,6 +48,9 @@ class ZhijiangCalendarPlugin(Star):
         self.cooldown = timedelta(
             minutes=max(int(config.get("refresh_cooldown_minutes", 30)), 0)
         )
+        self.help_text = str(config.get("help_text", DEFAULT_HELP_TEXT)).strip()
+        if not self.help_text:
+            self.help_text = DEFAULT_HELP_TEXT
         self._cache: dict[str, object] | None = None
         self._group_origins: dict[str, str] = {}
         self._last_fetch_at: datetime | None = None
@@ -274,6 +283,14 @@ class ZhijiangCalendarPlugin(Star):
     async def remember_group(self, event: AstrMessageEvent) -> None:
         """记录白名单群会话，以供定时主动推送。"""
         await self._remember_group_origin(event)
+
+    @filter.regex(r"^\s*帮助\s*$")
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    async def show_help(self, event: AstrMessageEvent):
+        """被提及时在任意群聊返回配置的帮助文本。"""
+        if not self._mentions_bot(event):
+            return
+        yield event.plain_result(self.help_text)
 
     @filter.regex(r"^\s*今日日程\s*$")
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
