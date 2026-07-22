@@ -1,14 +1,47 @@
-# astrbot-plugin-helloworld
+# 枝江日程
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+AstrBot 的 QQ 群直播日程推送插件。日程数据来自
+[asoul.love](https://asoul.love/#diary-drift)。
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+## 功能
 
-# Supports
+- 每天 `00:00`（Asia/Shanghai）抓取并缓存当天日程。
+- 每天 `09:00` 向配置的 QQ 群白名单推送；当天无直播时不推送。
+- 插件在零点后启动且当天没有缓存时会补抓，但不会补发已经错过的 9 点推送。
+- 手动刷新使用所有群共享的冷却时间，默认 30 分钟。
+- 缓存及群会话信息使用 AstrBot 插件 KV 存储，不写入插件目录。
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+## 配置
+
+在 AstrBot WebUI 的插件配置中填写：
+
+- `group_whitelist`：允许使用插件并接收推送的 QQ 群号列表。留空代表不启用任何群。
+- `refresh_cooldown_minutes`：手动刷新全局冷却分钟数，默认为 30。
+
+插件面向 `aiocqhttp`（OneBot v11）适配器。白名单群产生消息后，插件会记住
+AstrBot 的统一会话标识；在尚未取得会话标识时，会使用 OneBot 群号完成定时推送。
+
+## 群聊指令
+
+指令必须在白名单群中使用，并且需要提及机器人：
+
+- `@机器人 今日日程`：立即发送缓存中的今日日程；当天无缓存时抓取一次。
+- `@机器人 刷新日程`：重新抓取并发送今日日程，受全局冷却限制。
+
+手动查询时若当天没有直播，会回复“今日暂无直播安排”；定时任务则保持静默。
+
+## 消息示例
+
+```text
+【枝江今日日程｜7月22日】
+17:00｜【2D】摸鱼聊天室^-^｜心宜
+20:00｜小恶魔VS坏女人｜嘉然、乃琳
+```
+
+## 开发
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+发布前请在 `metadata.yaml` 中补充真实的 `author` 和 `repo`。

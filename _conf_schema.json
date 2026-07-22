@@ -1,0 +1,14 @@
+{
+  "group_whitelist": {
+    "description": "推送群白名单",
+    "hint": "填写允许查询并接收每日推送的 QQ 群号。留空时插件不会向任何群推送。",
+    "type": "list",
+    "default": []
+  },
+  "refresh_cooldown_minutes": {
+    "description": "手动刷新冷却（分钟）",
+    "hint": "所有群共享同一个刷新冷却时间，用于避免频繁访问日程网站。",
+    "type": "int",
+    "default": 30
+  }
+}

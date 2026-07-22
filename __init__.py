@@ -1,0 +1,1 @@
+"""AstrBot Zhijiang Calendar plugin."""
